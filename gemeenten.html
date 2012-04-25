@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+
+    <script type="text/javascript" src="js/d3/d3.v2.min.js"></script>
+    <script type="text/javascript" src="js/jquery-1.7.1.js"></script>
+    <script type="text/javascript" src="js/d3/lib/colorbrewer/colorbrewer.js"></script>
+    <script type="text/javascript" src="js/tipsy/jquery.tipsy.js"></script>
+    <link href="js/tipsy/tipsy.css" rel="stylesheet" type="text/css" />
+
+    <link type="text/css" rel="stylesheet" href="brewer.css"/>
+
+    <style>
+      body { 
+        background : rgb(150,150,150);
+        color : black;
+      }
+      h1 {
+        font-size : 150%;
+      }
+      #vis {
+        clear : left;
+        float : left;
+      }
+      #legend {
+        font-size : 80%;
+        float : left;
+        clear : right;
+        margin-left : 20px;
+      }
+      #legend table {
+        border-collapse : collapse;
+      }
+      #legend td.colour {
+        width : 1.5em;
+      }
+    </style>
+
+    <script>
+      
+      $(function() {
+        $("select").change(function() {
+          variable = $("select option:selected").attr("value");
+          vmin = data['meta'][variable]['min'];
+          vmax = data['meta'][variable]['max'];
+          vis.selectAll("path").attr("fill", data ? quantize_color : null);
+          generate_legend();
+          $("h1").text(data['meta'][variable]['name']);
+        });
+      })
+    </script>
+
+
+  </head>
+  <body>
+    <form>
+      <select>
+      </select>
+    </form>
+
+    <h1></h1>
+
+    <div id="vis">
+    </div>
+
+    <div id="legend" class="YlOrBr">
+      <table>
+        <tr><td>&nbsp;</td><td id="unit"></td></tr>
+        <tr><td class="q0-9 colour">&nbsp;</td><td id="q0-9"></td></tr>
+        <tr><td class="q1-9 colour">&nbsp;</td><td id="q1-9"></td></tr>
+        <tr><td class="q2-9 colour">&nbsp;</td><td id="q2-9"></td></tr>
+        <tr><td class="q3-9 colour">&nbsp;</td><td id="q3-9"></td></tr>
+        <tr><td class="q4-9 colour">&nbsp;</td><td id="q4-9"></td></tr>
+        <tr><td class="q5-9 colour">&nbsp;</td><td id="q5-9"></td></tr>
+        <tr><td class="q6-9 colour">&nbsp;</td><td id="q6-9"></td></tr>
+        <tr><td class="q7-9 colour">&nbsp;</td><td id="q7-9"></td></tr>
+        <tr><td class="q8-9 colour">&nbsp;</td><td id="q8-9"></td></tr>
+      </table>
+    </div>
+
+    <script>
+      // Settings
+      // - map
+      var xmin   =  13565.370;
+      var xmax   = 278018.300;
+      var ymin   = 306838.822;
+      var ymax   = 619305.625;
+      var height = 600;
+      var scale  = height/(ymax - ymin);
+      var width  = Math.ceil(height*(xmax - xmin)/(ymax - ymin));
+      // - colorscale
+      var nmax   = 9;
+      var cscale = colorbrewer.YlOrBr[nmax];
+      // - selected variable
+      var variable = "lft_0_15";
+      var vmin;
+      var vmax;
+
+      projection = function(coordinates) {
+        return [
+            scale*(coordinates[0]-xmin), 
+            height-scale*(coordinates[1]-ymin), 
+          ];
+      }
+      var path = d3.geo.path().projection(projection);
+
+      var vis = d3.select("#vis").append("svg").attr("width", width).attr("height", height)
+
+      var data;
+      var map;
+
+      function quantize(d, nmax) {
+        return Math.floor(Math.sqrt((data[d.properties.STATCODE][variable]-vmin)*0.999)/Math.sqrt(vmax-vmin)*nmax);
+      }
+      function quantize_color(d) {
+        return cscale[quantize(d, nmax)];
+      }
+      function generate_legend() {
+        // calculate precision
+        var d = String(Math.round(vmax - vmin));
+        var precision = 3 - d.length;
+        if (precision < 0) precision = 0;
+        // generate legend
+        var n = 0;
+        var previous_border = n*n*(vmax-vmin)/9.0/9.0 + vmin;
+        for (n++; n < 10; n++) {
+          var border = n*n*(vmax-vmin)/9.0/9.0 + vmin;
+          var str = previous_border.toFixed(precision) + " &ndash; " + border.toFixed(precision);
+          $("#q" + (n-1) + "-9").html(str);
+          previous_border = border;
+        }
+        $("#unit").html(data['meta'][variable]['unit']);
+      }
+
+      d3.json("data/data.json", function(json) {
+          data = json;
+          vmin = data['meta'][variable]['min'];
+          vmax = data['meta'][variable]['max'];
+          $.each(data.meta, function(key, value) {   
+              $('select').append($('<option>', { value : key }).text(value.name)); 
+            });
+        });
+      d3.json("gm_2010.json", function(json) {
+          map = json;
+          // create paths
+          vis.selectAll("path").data(json.features).enter().append("path")
+            .attr("d", path)
+            .attr("fill", data ? quantize_color : null)
+            .attr("stroke-width", "1")
+            .attr("stroke", "rgb(150,150,150)")
+            .attr("stroke-opacity", "0.9")
+            .on("mouseover", function(d, i) { 
+                d3.select(this).attr("stroke", "black")
+                  .attr("stroke-width","2").attr("stroke-opacity", "1");
+              })
+            .on("mouseleave", function(d, i) {
+                d3.select(this).attr("stroke", "rgb(150,150,150)")
+                  .attr("stroke-width","1").attr("stroke-opacity", "0.9");
+              });
+          // add tooltips to paths
+          $("path").tipsy({
+            gravity: 'w',
+            html: true,
+            title: function() {
+              var d = this.__data__;
+              var str = d.properties.GM_NAAM;
+              if (data) {
+                str += ": " + data[d.properties.STATCODE][variable];
+              }
+              return str;
+            }
+          });
+        })
+
+    </script>
+  </body>
+</html>
