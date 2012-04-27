@@ -141,7 +141,7 @@
               $('select').append($('<option>', { value : key }).text(value.name)); 
             });
         });
-      d3.json("gm_2010.json", function(json) {
+      d3.json("gm_2010_simplified.json", function(json) {
           map = json;
           // create paths
           vis.selectAll("path").data(json.features).enter().append("path")
