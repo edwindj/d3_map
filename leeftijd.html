@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+
+    <script type="text/javascript" src="js/d3/d3.v2.min.js"></script>
+    <script type="text/javascript" src="js/jquery-1.7.1.js"></script>
+    <script type="text/javascript" src="js/d3/lib/colorbrewer/colorbrewer.js"></script>
+    <script type="text/javascript" src="js/tipsy/jquery.tipsy.js"></script>
+    <link href="js/tipsy/tipsy.css" rel="stylesheet" type="text/css" />
+
+    <link type="text/css" rel="stylesheet" href="brewer.css"/>
+
+    <style>
+      body { 
+        background : rgb(150,150,150);
+        color : black;
+      }
+      h1 {
+        font-size : 150%;
+      }
+      #vis {
+        clear : left;
+        float : left;
+      }
+      .map {
+        float : left;
+      }
+      #legend {
+        font-size : 80%;
+        float : left;
+        clear : right;
+        margin-left : 20px;
+      }
+      #legend table {
+        border-collapse : collapse;
+      }
+      #legend td.colour {
+        width : 1.5em;
+      }
+    </style>
+
+    <script>
+      
+      $(function() {
+        $("select").change(function() {
+          variable = $("select option:selected").attr("value");
+          vmin = data['meta'][variable]['min'];
+          vmax = data['meta'][variable]['max'];
+          vis.selectAll("path").attr("fill", data ? quantize_color : null);
+          generate_legend();
+          $("h1").text(data['meta'][variable]['name']);
+        });
+      })
+    </script>
+
+
+  </head>
+  <body>
+    <h1>Leeftijdsverdeling Nederland</h1>
+
+    <div id="vis">
+      <div class="map" id="lft_0_15">
+      </div>
+      <div class="map" id="lft_15_65">
+      </div>
+      <div class="map" id="lft_65">
+      </div>
+    </div>
+
+    <div id="legend" class="YlOrBr">
+      <table>
+        <tr><td>&nbsp;</td><td id="unit"></td></tr>
+        <tr><td class="q0-9 colour">&nbsp;</td><td id="q0-9"></td></tr>
+        <tr><td class="q1-9 colour">&nbsp;</td><td id="q1-9"></td></tr>
+        <tr><td class="q2-9 colour">&nbsp;</td><td id="q2-9"></td></tr>
+        <tr><td class="q3-9 colour">&nbsp;</td><td id="q3-9"></td></tr>
+        <tr><td class="q4-9 colour">&nbsp;</td><td id="q4-9"></td></tr>
+        <tr><td class="q5-9 colour">&nbsp;</td><td id="q5-9"></td></tr>
+        <tr><td class="q6-9 colour">&nbsp;</td><td id="q6-9"></td></tr>
+        <tr><td class="q7-9 colour">&nbsp;</td><td id="q7-9"></td></tr>
+        <tr><td class="q8-9 colour">&nbsp;</td><td id="q8-9"></td></tr>
+      </table>
+    </div>
+
+    <script>
+      // Settings
+      // - map
+      var xmin   =  13565.370;
+      var xmax   = 278018.300;
+      var ymin   = 306838.822;
+      var ymax   = 619305.625;
+      var height = 500;
+      var scale  = height/(ymax - ymin);
+      var width  = Math.ceil(height*(xmax - xmin)/(ymax - ymin));
+      // - colorscale
+      var nmax   = 9;
+      var cscale = colorbrewer.YlOrBr[nmax];
+      // - selected variable
+      var variable = "lft_0_15";
+      var vmin = 5;
+      var vmax = 80;
+
+      projection = function(coordinates) {
+        return [
+            scale*(coordinates[0]-xmin), 
+            height-scale*(coordinates[1]-ymin), 
+          ];
+      }
+      var path = d3.geo.path().projection(projection);
+
+      var data;
+      var map;
+
+      function quantize(d, nmax, variable) {
+        return Math.floor(Math.sqrt((data[d.properties.STATCODE][variable]-vmin)*0.999)/Math.sqrt(vmax-vmin)*nmax);
+      }
+      function quantize_color(d, variable) {
+        return cscale[quantize(d, nmax, variable)];
+      }
+      function generate_legend() {
+        // calculate precision
+        var d = String(Math.round(vmax - vmin));
+        var precision = 3 - d.length;
+        if (precision < 0) precision = 0;
+        // generate legend
+        var n = 0;
+        var previous_border = n*n*(vmax-vmin)/9.0/9.0 + vmin;
+        for (n++; n < 10; n++) {
+          var border = n*n*(vmax-vmin)/9.0/9.0 + vmin;
+          var str = previous_border.toFixed(precision) + " &ndash; " + border.toFixed(precision);
+          $("#q" + (n-1) + "-9").html(str);
+          previous_border = border;
+        }
+        $("#unit").html(data['meta'][variable]['unit']);
+      }
+
+      function draw_maps() {
+        // create paths
+        $(".map").each(function() {
+            var variable = this.id;
+            var vis = d3.select("#" + this.id).append("svg").attr("width", width).attr("height", height)
+            vis.selectAll("path").data(map.features).enter().append("path")
+              .attr("d", path)
+              .attr("fill", function(d) {
+                  if (!data) {
+                    return null;
+                  } else {
+                    return quantize_color(d, variable);
+                  }
+                })
+              .attr("stroke-width", "1")
+              .attr("stroke", "rgb(150,150,150)")
+              .attr("stroke-opacity", "0.9");
+          });
+       }
+
+
+
+      d3.json("data/data.json", function(json) {
+          data = json;
+      d3.json("gm_2010_simplified.json", function(json) {
+          map = json;
+          draw_maps();
+        })
+        });
+
+    </script>
+  </body>
+</html>
